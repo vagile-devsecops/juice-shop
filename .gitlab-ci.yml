@@ -3,10 +3,24 @@ variables:
   IMAGE_TAG: 1.0
 
 stages:
+  - cache
   - test
   - build
 
-
+# create_cache:
+#   image: cypress/browsers:node-22.21.0-chrome-141.0.7390.107-1-ff-144.0-edge-141.0.3537.92-1
+#   stage: cache
+#   script:
+#     - yarn install
+#   cache:
+#     key:
+#       files:
+#         - yarn.lock
+#     paths:
+#       - node_modules/
+#       - yarn.lock
+#       - .yarn
+#     policy: pull-push
 yarn-test:
   image: cypress/browsers:node-22.21.0-chrome-141.0.7390.107-1-ff-144.0-edge-141.0.3537.92-1
   stage: test
@@ -14,17 +28,39 @@ yarn-test:
     - yarn install 
     - yarn test
 
+gitleaks:
+  stage: test
+  image:
+    name: zricethezav/gitleaks
+    entrypoint: [""]
+  script:
+    - gitleaks detect --verbose --source .
+
+njsscan:
+  stage: test
+  image: python:3.13
+  before_script: 
+    - pip3 install --upgrade njsscan
+  script:
+    - njsscan .
+
+semgrep:
+  stage: test
+  image: returntocorp/semgrep
+  variables:
+    SEMGREP_RULES: p/javascript
+  script:
+    - semgrep ci
+
 
 build_image:
   image: docker:29
   stage: build
   services:
     - docker:29-dind
-  variables:
-    DOCKER_PASS: your PAT
-    DOCKER_USER: your username
+
   before_script:
-    - echo $DOCKER_PASS | docker login -u $DOCKER_USER --pasword-stdin
+    - echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
   script:
     - docker build -t $IMAGE_NAME:$IMAGE_TAG .
     - docker push $IMAGE_NAME:$IMAGE_TAG
